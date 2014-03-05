@@ -128,7 +128,35 @@ class BLPatch(BasePatch):
         b = (0xF800 | diff_lower)
         c = (a << 16) | b
         print "patched: %X to call %X BL opcode: %X" % (src, dst, c)
-        return struct.pack("<HH", a, b)        
+        return struct.pack("<HH", a, b)
+
+class BPatch(BasePatch):
+    ''' Generates a B.W opcode patch'''
+    def __init__(self, pos, to, real_from=None):
+        '''Creates a B.W patch at pos which will jump to the 'to' destination.
+        The read_from paramter needs to be used when the opcodes are copied
+        from the pos address to another, and it should contain the address
+        which the patch will run from.'''
+        if real_from == None:
+            real_from = pos
+        self.pos = pos
+        self.data = self.patch_b(real_from, to)
+
+    def patch_b(self, src, dst):
+        diff = dst - src - 4
+        diff_upper = (diff >> 12) & 0x3ff
+        diff_lower = ((diff & 0xfff) >> 1) | (((diff >>22)&1) << 11) | (((diff >> 23) & 1) <<13)
+        a = (0xF000 | diff_upper)# << 16
+        b = (0x9000 | diff_lower)
+        if diff < 0:
+            a |= 0x0400
+        else:
+            b = b^ 0x2800
+        c = (a << 16) | b
+        print "patched: %X to call %X B.W opcode: %s" % (src, dst,
+                struct.pack("<HH", a, b).encode('hex'))
+        return struct.pack("<HH", a, b)  
+
         
 def patch_firmware(src,dst, patchs, extra = "", **kargs):
     firmware = file(src,'rb').read()
